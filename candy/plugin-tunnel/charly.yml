@@ -1,7 +1,5 @@
-version: 2026.232.0520
 plugin-tunnel:
     candy:
-        version: 2026.182.1200
         description: |-
             OUT-OF-TREE charly plugin serving the `tunnel` VERB (verb:tunnel) — the
             externalized tailscale/cloudflare TUNNEL EXECUTION LEG (core-externalization
