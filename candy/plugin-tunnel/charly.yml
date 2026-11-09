@@ -4,8 +4,8 @@ plugin-tunnel:
             OUT-OF-TREE charly plugin serving the `tunnel` VERB (verb:tunnel) — the
             externalized tailscale/cloudflare TUNNEL EXECUTION LEG (core-externalization
             cutover C16b). It is DUAL-PLACEMENT: its importable provider package
-            (NewProvider/NewMeta, serving verb:tunnel + its self-contained CUE schema over
-            the SDK Describe channel) is COMPILED INTO charly when listed in charly.yml
+            (NewProvider/NewMeta, serving verb:tunnel + its CUE schema — which imports the
+            contract module's tunnel wire definitions — over the SDK Describe channel) is COMPILED INTO charly when listed in charly.yml
             `compiled_plugins:` (the default — registered in-process via
             registerCompiledPlugin), and the SAME provider is served OUT-OF-PROCESS over
             go-plugin gRPC by the cmd/serve shim (host-built + connected via LocalTransport)

@@ -39,8 +39,9 @@ var schemaFS embed.FS
 // NewProvider returns the verb provider for in-proc registration or out-of-proc serving.
 func NewProvider() pb.ProviderServer { return &provider{} }
 
-// NewMeta advertises verb:tunnel + its self-contained CUE schema (via sdk.NewMeta →
-// BuildCapabilities). Unlike most externalized verbs, verb:tunnel DOES carry an authored
+// NewMeta advertises verb:tunnel + its served CUE schema (via sdk.NewMeta →
+// BuildCapabilities); the schema imports the contract module's tunnel wire definitions
+// instead of restating them. Unlike most externalized verbs, verb:tunnel DOES carry an authored
 // plugin_input (the `plan` dry-run step's {method,config,expect}), so it advertises the
 // #TunnelInput def.
 func NewMeta() pb.PluginMetaServer {

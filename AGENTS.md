@@ -13,7 +13,9 @@ Canonical files:
 - `candy/plugin-tunnel/plugin.go` — the provider (`NewProvider`/`NewMeta`) +
   the `start`/`stop`/`setup`/`plan` methods.
 - `candy/plugin-tunnel/tunnel_exec.go` — the tailscale/cloudflared execution leg.
-- `candy/plugin-tunnel/schema/tunnel.cue` — the self-contained input schema.
+- `candy/plugin-tunnel/schema/tunnel.cue` — the input schema: it declares the plugin's own
+  `#TunnelInput` and IMPORTS the contract module's `#TunnelConfig` / `#TunnelPort` (it no
+  longer restates them).
 - `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
 - `README.md` — user overview only; never agent guidance.
 
