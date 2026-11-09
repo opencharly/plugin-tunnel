@@ -23,14 +23,15 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/opencharly/plugin-tunnel/candy/plugin-tunnel/params"
+	"github.com/opencharly/spec/spec"
 )
 
 // --- pure helpers (plugin-local copies of the core helpers) ---
 
 // backend returns the localhost backend port, defaulting to Port if BackendPort is zero.
-// (params.TunnelPort ports are int64 — the gengotypes rendering of the CUE int.)
-func backend(tp params.TunnelPort) int64 {
+// (spec.TunnelPort ports are `int` — the CUE int rendered through the contract's
+// `@go(Port,type=int)` attribute.)
+func backend(tp spec.TunnelPort) int {
 	if tp.BackendPort != 0 {
 		return tp.BackendPort
 	}
@@ -38,7 +39,7 @@ func backend(tp params.TunnelPort) int64 {
 }
 
 // schemeTarget returns the backend URL for a given scheme and port.
-func schemeTarget(scheme string, port int64) string {
+func schemeTarget(scheme string, port int) string {
 	switch scheme {
 	case "tcp", "tls-terminated-tcp":
 		return fmt.Sprintf("tcp://127.0.0.1:%d", port)
@@ -83,19 +84,19 @@ func serveVerb(public bool) string {
 
 // tailscaleStartArgv builds the argv `tailscale serve|funnel --bg <flag>=<port> <target>`
 // the start path runs (and the plan dry-run asserts).
-func tailscaleStartArgv(tp params.TunnelPort) []string {
+func tailscaleStartArgv(tp spec.TunnelPort) []string {
 	return []string{
 		"tailscale", serveVerb(tp.Public), "--bg",
-		tailscaleFlag(tp.Protocol) + "=" + strconv.FormatInt(tp.Port, 10),
+		tailscaleFlag(tp.Protocol) + "=" + strconv.Itoa(tp.Port),
 		schemeTarget(tp.Protocol, backend(tp)),
 	}
 }
 
 // tailscaleStopArgv builds the argv `tailscale serve|funnel <flag>=<port> off`.
-func tailscaleStopArgv(tp params.TunnelPort) []string {
+func tailscaleStopArgv(tp spec.TunnelPort) []string {
 	return []string{
 		"tailscale", serveVerb(tp.Public),
-		tailscaleFlag(tp.Protocol) + "=" + strconv.FormatInt(tp.Port, 10),
+		tailscaleFlag(tp.Protocol) + "=" + strconv.Itoa(tp.Port),
 		"off",
 	}
 }
@@ -103,7 +104,7 @@ func tailscaleStopArgv(tp params.TunnelPort) []string {
 // --- dispatch: start / stop ---
 
 // tunnelStart dispatches to the appropriate provider's start path.
-func tunnelStart(cfg params.TunnelConfig) error {
+func tunnelStart(cfg spec.TunnelConfig) error {
 	switch cfg.Provider {
 	case "tailscale":
 		for _, tp := range cfg.Ports {
@@ -120,7 +121,7 @@ func tunnelStart(cfg params.TunnelConfig) error {
 }
 
 // tunnelStop dispatches to the appropriate provider's stop path.
-func tunnelStop(cfg params.TunnelConfig) error {
+func tunnelStop(cfg spec.TunnelConfig) error {
 	switch cfg.Provider {
 	case "tailscale":
 		for _, tp := range cfg.Ports {
@@ -145,7 +146,7 @@ func accessLabel(public bool) string {
 	return "private"
 }
 
-func tailscaleOneStart(tp params.TunnelPort) error {
+func tailscaleOneStart(tp spec.TunnelPort) error {
 	if tp.Protocol == "udp" {
 		fmt.Fprintf(os.Stderr, "Warning: port %d (UDP) cannot be tunneled — tailscale %s only supports TCP/HTTPS. UDP traffic works directly between tailnet nodes.\n", tp.Port, serveVerb(tp.Public))
 		return nil
@@ -169,7 +170,7 @@ func tailscaleOneStart(tp params.TunnelPort) error {
 	return nil
 }
 
-func tailscaleOneStop(tp params.TunnelPort) error {
+func tailscaleOneStop(tp spec.TunnelPort) error {
 	if tp.Protocol == "udp" {
 		return nil // UDP ports are not tunneled
 	}
@@ -229,7 +230,7 @@ type cloudflaredTunnel struct {
 // cloudflareTunnelSetup creates the tunnel, writes config YAML, and routes DNS. Called by
 // charly config (quadlet mode) for setup-only via the core adapter, and by
 // cloudflareTunnelStart (direct mode). Returns the tunnel name and config file path.
-func cloudflareTunnelSetup(cfg params.TunnelConfig) (tunnelName, configPath string, err error) {
+func cloudflareTunnelSetup(cfg spec.TunnelConfig) (tunnelName, configPath string, err error) {
 	name := cfg.TunnelName
 
 	uuid, err := findCloudflaredTunnel(name)
@@ -304,7 +305,7 @@ func cloudflareTunnelSetup(cfg params.TunnelConfig) (tunnelName, configPath stri
 // cloudflareTunnelStart sets up the tunnel (create, config, DNS) then starts the
 // cloudflared process (direct mode). In quadlet mode, the core calls setup and the
 // systemd service runs cloudflared.
-func cloudflareTunnelStart(cfg params.TunnelConfig) error {
+func cloudflareTunnelStart(cfg spec.TunnelConfig) error {
 	name, cfgPath, err := cloudflareTunnelSetup(cfg)
 	if err != nil {
 		return err
@@ -330,7 +331,7 @@ func cloudflareTunnelStart(cfg params.TunnelConfig) error {
 }
 
 // collectUniqueHostnames returns deduplicated hostnames from tunnel config ports.
-func collectUniqueHostnames(cfg params.TunnelConfig) []string {
+func collectUniqueHostnames(cfg spec.TunnelConfig) []string {
 	seen := make(map[string]bool)
 	var result []string
 	for _, tp := range cfg.Ports {
@@ -346,7 +347,7 @@ func collectUniqueHostnames(cfg params.TunnelConfig) []string {
 	return result
 }
 
-func cloudflareTunnelStop(cfg params.TunnelConfig) error {
+func cloudflareTunnelStop(cfg spec.TunnelConfig) error {
 	name := cfg.TunnelName
 
 	pidPath, err := tunnelPIDPath(name)
@@ -430,7 +431,7 @@ func createCloudflaredTunnel(name string) (string, error) {
 // tunnelPlan builds the argv the start path WOULD run (without exec) and, when `expect`
 // is set, asserts it matches — proving registry dispatch + the TunnelConfig wire
 // round-trip + the moved command-building logic with ZERO tailscale/cloudflare creds.
-func tunnelPlan(cfg params.TunnelConfig, expect []string) pluginCheckResult {
+func tunnelPlan(cfg spec.TunnelConfig, expect []string) pluginCheckResult {
 	lines, err := planArgvLines(cfg)
 	if err != nil {
 		return pluginCheckResult{Status: "fail", Message: err.Error()}
@@ -449,7 +450,7 @@ func tunnelPlan(cfg params.TunnelConfig, expect []string) pluginCheckResult {
 // would run: for tailscale, the exact `tailscale serve|funnel …` argv (via the SAME
 // builder the exec uses); for cloudflare, the ingress rules setup would write plus the run
 // command (no $HOME-dependent config path, so the dry-run stays host-independent).
-func planArgvLines(cfg params.TunnelConfig) ([]string, error) {
+func planArgvLines(cfg spec.TunnelConfig) ([]string, error) {
 	var lines []string
 	switch cfg.Provider {
 	case "tailscale":

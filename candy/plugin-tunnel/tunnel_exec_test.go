@@ -14,6 +14,7 @@ import (
 
 	"github.com/opencharly/plugin-tunnel/candy/plugin-tunnel/params"
 	pb "github.com/opencharly/spec/proto"
+	"github.com/opencharly/spec/spec"
 )
 
 // TestInvoke_PlanWireRoundTrip proves the FULL wire path both callers use: the
@@ -23,9 +24,9 @@ import (
 func TestInvoke_PlanWireRoundTrip(t *testing.T) {
 	in := params.TunnelInput{
 		Method: "plan",
-		Config: params.TunnelConfig{
+		Config: spec.TunnelConfig{
 			Provider: "tailscale",
-			Ports:    []params.TunnelPort{{Port: 8888, BackendPort: 8888, Protocol: "http", Public: false}},
+			Ports:    []spec.TunnelPort{{Port: 8888, BackendPort: 8888, Protocol: "http", Public: false}},
 		},
 		Expect: []string{"tailscale serve --bg --https=8888 http://127.0.0.1:8888"},
 	}
@@ -67,10 +68,10 @@ func TestInvoke_UnknownMethod(t *testing.T) {
 // check-tunnel-pod bed (tunnel-plan-tailscale) and the candy's tunnel-plan-argv ADE
 // step assert. Guards the moved command-building logic + the backend/flag/scheme helpers.
 func TestPlanArgvLines_Tailscale(t *testing.T) {
-	cfg := params.TunnelConfig{
+	cfg := spec.TunnelConfig{
 		Provider: "tailscale",
 		BoxName:  "check-tunnel-pod",
-		Ports: []params.TunnelPort{
+		Ports: []spec.TunnelPort{
 			{Port: 8888, BackendPort: 8888, Protocol: "http", Public: false},
 			{Port: 443, BackendPort: 443, Protocol: "https+insecure", Public: true},
 		},
@@ -92,12 +93,12 @@ func TestPlanArgvLines_Tailscale(t *testing.T) {
 // host-independent ingress + run representation the check-tunnel-pod bed
 // (tunnel-plan-cloudflare) asserts.
 func TestPlanArgvLines_Cloudflare(t *testing.T) {
-	cfg := params.TunnelConfig{
+	cfg := spec.TunnelConfig{
 		Provider:   "cloudflare",
 		TunnelName: "charly-check-tunnel",
 		Hostname:   "tunnel.example.com",
 		BoxName:    "check-tunnel-pod",
-		Ports: []params.TunnelPort{
+		Ports: []spec.TunnelPort{
 			{Port: 8080, BackendPort: 8080, Protocol: "https", Public: true},
 		},
 	}
@@ -117,9 +118,9 @@ func TestPlanArgvLines_Cloudflare(t *testing.T) {
 // TestPlanArgvLines_TCPAndBackend proves the tcp scheme + a distinct backend_port flow
 // through tailscaleFlag/schemeTarget/backend correctly.
 func TestPlanArgvLines_TCPAndBackend(t *testing.T) {
-	cfg := params.TunnelConfig{
+	cfg := spec.TunnelConfig{
 		Provider: "tailscale",
-		Ports: []params.TunnelPort{
+		Ports: []spec.TunnelPort{
 			{Port: 10000, BackendPort: 5432, Protocol: "tcp", Public: false},
 			{Port: 47998, Protocol: "udp", Public: false}, // udp is never tunneled → skipped
 		},
@@ -137,9 +138,9 @@ func TestPlanArgvLines_TCPAndBackend(t *testing.T) {
 // TestTunnelPlan_ExpectMatch proves the self-asserting plan verb: matching expect → pass,
 // mismatched expect → fail, unknown provider → fail.
 func TestTunnelPlan_ExpectMatch(t *testing.T) {
-	cfg := params.TunnelConfig{
+	cfg := spec.TunnelConfig{
 		Provider: "tailscale",
-		Ports:    []params.TunnelPort{{Port: 8888, Protocol: "http"}},
+		Ports:    []spec.TunnelPort{{Port: 8888, Protocol: "http"}},
 	}
 	if r := tunnelPlan(cfg, []string{"tailscale serve --bg --https=8888 http://127.0.0.1:8888"}); r.Status != "pass" {
 		t.Errorf("matching expect: status=%q message=%q, want pass", r.Status, r.Message)
@@ -147,7 +148,7 @@ func TestTunnelPlan_ExpectMatch(t *testing.T) {
 	if r := tunnelPlan(cfg, []string{"wrong argv"}); r.Status != "fail" {
 		t.Errorf("mismatched expect: status=%q, want fail", r.Status)
 	}
-	if r := tunnelPlan(params.TunnelConfig{Provider: "bogus"}, nil); r.Status != "fail" {
+	if r := tunnelPlan(spec.TunnelConfig{Provider: "bogus"}, nil); r.Status != "fail" {
 		t.Errorf("unknown provider: status=%q, want fail", r.Status)
 	}
 }
@@ -186,7 +187,7 @@ func TestCloudflareTunnelStop_AlreadyGonePID(t *testing.T) {
 	}
 
 	stderr := captureStderr(t, func() {
-		if err := cloudflareTunnelStop(params.TunnelConfig{TunnelName: name}); err != nil {
+		if err := cloudflareTunnelStop(spec.TunnelConfig{TunnelName: name}); err != nil {
 			t.Errorf("cloudflareTunnelStop(already-gone PID): unexpected error: %v", err)
 		}
 	})
